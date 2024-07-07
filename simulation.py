@@ -46,13 +46,6 @@ def vote(user, post):
         vote_decision = 'downvote' if random.uniform(0, 1) < user.adjusted_goodness else random.choice(['downvote', 'upvote'])
     return vote_decision
 
-# def stage_voting(stage_users, post):
-#     votes = []
-#     for user in stage_users:
-#         vote_decision = vote(user, post)
-#         votes.append((user, vote_decision))
-#     return votes
-
 def stage_voting(stage_users, post, forfeit_bonus=5):
     votes = []
     stage_decision = 'draw'
@@ -120,28 +113,6 @@ def vote(user, post):
     else:
         vote_decision = 'downvote' if random.uniform(0, 1) < user.adjusted_goodness else random.choice(['downvote', 'upvote'])
     return vote_decision
-
-# def calculate_majority_vote(votes):
-#     upvotes = [vote for user, vote in votes if vote == 'upvote']
-#     downvotes = [vote for user, vote in votes if vote == 'downvote']
-#     majority_vote = 'upvote' if len(upvotes) > len(downvotes) else 'downvote' if len(downvotes) > len(upvotes) else 'draw'
-#     return majority_vote
-
-# def calculate_elo_updates(votes):
-#     majority_vote = calculate_majority_vote(votes)
-    
-#     if majority_vote == 'draw':
-#         return majority_vote
-    
-#     average_elo = np.mean([user.elo for user, _ in votes])
-    
-#     for user, vote in votes:
-#         if vote == majority_vote:
-#             user.elo, _ = elo_update(user.elo, average_elo)
-#         else:
-#             _, user.elo = elo_update(average_elo, user.elo)
-    
-#     return majority_vote
 
 def run_simulation(n_users, n_posts):
     users = [User(i) for i in range(n_users)]
