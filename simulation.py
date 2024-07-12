@@ -13,9 +13,9 @@ class User:
         self.adjusted_goodness = self.goodness
 
     def generate_goodness(self):
-        goodness = 1 - np.random.exponential(scale=0.3)  # Adjusted scale to 0.3
-        while goodness < 0:
-            goodness = 1 - np.random.exponential(scale=0.3)
+        goodness = np.random.exponential(scale=0.3)  # Adjusted scale to 0.3
+        if goodness > 1:
+            goodness = np.random.uniform()
         return goodness
 
     def apply_mood(self):
@@ -76,9 +76,10 @@ def stage_voting(stage_users, post, forfeit_bonus=5):
         return votes, stage_decision
 
     if not losing_team:
-        # Forfeit case: Winning team gets a small fixed number of points
-        for user in winning_team:
-            user.elo += forfeit_bonus
+        if len(votes) > 1:
+            # Forfeit case: Winning team gets a small fixed number of points
+            for user in winning_team:
+                user.elo += forfeit_bonus
     else:
         average_winner_elo = sum(user.elo for user in winning_team) / len(winning_team)
         average_loser_elo = sum(user.elo for user in losing_team) / len(losing_team)
@@ -114,7 +115,7 @@ def vote(user, post):
         vote_decision = 'downvote' if random.uniform(0, 1) < user.adjusted_goodness else random.choice(['downvote', 'upvote'])
     return vote_decision
 
-def run_simulation(n_users, n_posts):
+def run_simulation(n_users, n_posts, stages_percentiles = [50, 75]):
     users = [User(i) for i in range(n_users)]
     posts = [Post(i) for i in range(n_posts)]
     upvoted_posts_quality = []
@@ -123,32 +124,37 @@ def run_simulation(n_users, n_posts):
     correct_votes = 0
     votes_stats = []
 
-    # Initialize the progress bar
-    pbar = tqdm(total=len(posts), desc="Processing items")
+    for post in tqdm(posts, desc="Voting for posts"):
+        # Extract the elo ratings
+        elos = np.array([user.elo for user in users])
+        stages_percentiles_elo = np.percentile(elos, stages_percentiles)
 
-    for post in posts:
-        sorted_users = sorted(users, key=lambda x: x.elo)
+        if len(votes_stats) > 10:
+            votes_stats = votes_stats[-10:]
         
         # Stage 1 voting
-        stage1_candidates = sorted_users[:len(users) // 2]
-        num_stage1_users = min(10, max(1, len(stage1_candidates) // 100))
+        stage1_candidates = [user for user in users if user.elo <= stages_percentiles_elo[0]]
+        num_stage1_users = min(5, len(stage1_candidates))
         stage1_users = random.sample(stage1_candidates, num_stage1_users)
         stage1_votes, stage1_decision = stage_voting(stage1_users, post)
         total_votes += 1
 
-        pbar.update(1)
-
         if stage1_decision == 'upvote' and post.quality >= 0.5 or stage1_decision == 'downvote' and post.quality < 0.5:
             correct_votes += 1
 
-        votes_stats.append((1, post, stage1_votes, stage1_decision))
+        votes_stats.append((1, post, stage1_votes, stage1_decision, users, len(stage1_candidates), num_stage1_users))
 
-        if stage1_decision != 'upvote':
+        if stage1_decision == 'downvote':
             continue  # Skip to the next post if majority vote is not 'upvote'
 
+        if len(users) == len(stage1_candidates):
+            upvoted_posts_count += 1
+            upvoted_posts_quality.append(post.quality)
+            continue
+
         # Stage 2 voting
-        stage2_candidates = sorted_users[len(users) // 2 : int(len(users) * 0.8)]
-        num_stage2_users = min(10, max(1, len(stage2_candidates) // 100))
+        stage2_candidates = [user for user in users if user.elo > stages_percentiles_elo[0] and user.elo <= stages_percentiles_elo[1]]
+        num_stage2_users = min(5, len(stage2_candidates))
         stage2_users = random.sample(stage2_candidates, num_stage2_users)
         stage2_votes, stage2_decision = stage_voting(stage2_users, post)
         total_votes += 1
@@ -156,14 +162,19 @@ def run_simulation(n_users, n_posts):
         if stage2_decision == 'upvote' and post.quality >= 0.5 or stage2_decision == 'downvote' and post.quality < 0.5:
             correct_votes += 1
 
-        votes_stats.append((2, post, stage2_votes, stage2_decision))
+        votes_stats.append((2, post, stage2_votes, stage2_decision, users, len(stage2_candidates), num_stage2_users))
 
-        if stage2_decision != 'upvote':
+        if stage2_decision == 'downvote':
             continue  # Skip to the next post if majority vote is not 'upvote'
 
+        if len(users) == len(stage2_candidates):
+            upvoted_posts_count += 1
+            upvoted_posts_quality.append(post.quality)
+            continue
+
         # Stage 3 voting
-        stage3_candidates = sorted_users[int(len(users) * 0.8):]
-        num_stage3_users = min(10, max(1, len(stage3_candidates) // 100))
+        stage3_candidates = [user for user in users if user.elo > stages_percentiles_elo[1]]
+        num_stage3_users = min(5, len(stage3_candidates))
         stage3_users = random.sample(stage3_candidates, num_stage3_users)
         stage3_votes, stage3_decision = stage_voting(stage3_users, post)
         total_votes += 1
@@ -171,65 +182,93 @@ def run_simulation(n_users, n_posts):
         if stage3_decision == 'upvote' and post.quality >= 0.5 or stage3_decision == 'downvote' and post.quality < 0.5:
             correct_votes += 1
 
-        votes_stats.append((3, post, stage3_votes, stage3_decision))
+        votes_stats.append((3, post, stage3_votes, stage3_decision, users, len(stage3_candidates), num_stage3_users))
 
         if stage3_decision == 'upvote':
             upvoted_posts_count += 1
             upvoted_posts_quality.append(post.quality)
 
-        if len(votes_stats) > 10:
-            votes_stats = votes_stats[-10:]
-
     for vote_stat in votes_stats:
         printStageResult(*vote_stat)
 
+    print(f"Stage 1 percentile: {stages_percentiles[0]:.2f}%")
+    print(f"Stage 1 percentile elo: {stages_percentiles_elo[0]:.2f}")
+    print(f"Stage 2 percentile: {stages_percentiles[1]:.2f}%")
+    print(f"Stage 2 percentile elo: {stages_percentiles_elo[1]:.2f}")
+    print(f"Stage 3 percentile: {(100 - stages_percentiles[1]):.2f}%")
     print(f"Number of posts upvoted through all 3 stages: {upvoted_posts_count}")
     print(f"Number of posts upvoted through all 3 stages (percent): {(upvoted_posts_count / total_votes) * 100:.2f}%")
     print(f"Number of correct votes: {correct_votes}")
     print(f"Total number of votes: {total_votes}")
-    print(f"Correct vote percentage: {(correct_votes / total_votes) * 100:.2f}%")
-    plot_distributions(users, upvoted_posts_quality)
+    print(f"Correct votes: {(correct_votes / total_votes) * 100:.2f}%")
+    plot_distributions(users, upvoted_posts_quality, correct_votes, total_votes, stages_percentiles_elo=stages_percentiles_elo)
     return users
 
-def printStageResult(stage, post, votes, stage_result):
+def printStageResult(stage, post, votes, stage_result, users, users_stage_count, num_stage_users):
     print(f"Stage {stage} voting for Post {post.id} (Quality: {post.quality:.2f}):")
+    print(f"Total users: {len(users)}; In stage: {users_stage_count}; Selected: {num_stage_users}")
     for user, vote in votes:
-        vote_colored = colored(vote, 'green' if vote == 'upvote' else 'red')
+        color_mapping = {
+            'upvote': 'green',
+            'downvote': 'red',
+            'draw': 'yellow'
+        }
+
+        vote_colored = colored(vote, color_mapping.get(vote, 'default_color'))
         print(f"User {user.id} (Adj. Goodness: {user.adjusted_goodness:.2f}, ELO: {user.elo:.2f}) voted {vote_colored}")
-    stage1_result_colored = colored(stage_result, 'green' if stage_result == 'upvote' else 'red')
+    stage1_result_colored = colored(stage_result, color_mapping.get(stage_result, 'default_color'))
     print(f"Stage {stage} majority decision: {stage1_result_colored}\n")
 
-def plot_distributions(users, upvoted_posts_quality):
+def plot_distributions(users, upvoted_posts_quality, correct_votes, total_votes, stages_percentiles_elo):
     elo_ratings = [user.elo for user in users]
     goodness_factors = [user.goodness for user in users]
 
     plt.figure(figsize=(18, 6))
 
-    plt.subplot(1, 3, 1)
+    plt.subplot(2, 3, 1)
     plt.yscale('log')
-    plt.hist(elo_ratings, bins=100, edgecolor='black')
+    n, bins, patches = plt.hist(elo_ratings, bins=100, edgecolor='black')
+    # Define colors for each percentile range
+    colors = ['blue', 'green', 'red']
+
+    # Paint each percentile range
+    for i in range(len(bins) - 1):
+        if bins[i] < stages_percentiles_elo[0]:
+            patches[i].set_facecolor(colors[0])
+        elif bins[i] >= stages_percentiles_elo[0] and bins[i] < stages_percentiles_elo[1]:
+            patches[i].set_facecolor(colors[1])
+        elif  bins[i] >= stages_percentiles_elo[1]:
+            patches[i].set_facecolor(colors[2])
+
     plt.xlabel('Elo Rating')
     plt.ylabel('Number of Users')
     plt.title('Distribution of Users by Elo Rating')
 
-    plt.subplot(1, 3, 2)
+    plt.subplot(2, 3, 2)
     plt.hist(goodness_factors, bins=100, edgecolor='black')
     plt.xlabel('Goodness Factor')
     plt.ylabel('Number of Users')
     plt.title('Distribution of Users by Goodness Factor')
 
-    plt.subplot(1, 3, 3)
-    plt.hist(upvoted_posts_quality, bins=50, edgecolor='black')
+    plt.subplot(2, 3, 3)
+    plt.hist(upvoted_posts_quality, bins=100, edgecolor='black')
     plt.xlabel('Post Quality')
     plt.ylabel('Number of Posts')
     plt.title('Distribution of Upvoted Posts by Quality')
+
+    # Plot
+    plt.subplot(2, 3, 4)
+    labels = 'Good Posts', 'Bad Posts'
+    explode = (0, 0)
+    colors = ['blue', 'lightgray']
+    plt.pie([correct_votes, total_votes - correct_votes], explode=explode, labels=labels, colors=colors, autopct='%1.1f%%', shadow=True, startangle=90)
 
     plt.tight_layout()
     plt.show()
 
 # Parameters
-n_users = 10000
-n_posts = 50000
+n_users = 700
+n_posts = 3000
 
 # Run simulation
 users = run_simulation(n_users, n_posts)
