@@ -115,13 +115,14 @@ def vote(user, post):
         vote_decision = 'downvote' if random.uniform(0, 1) < user.adjusted_goodness else random.choice(['downvote', 'upvote'])
     return vote_decision
 
-def run_simulation(n_users, n_posts, stages_percentiles = [50, 75]):
+def run_simulation(n_users, n_posts, stages_percentiles = [70, 90]):
     users = [User(i) for i in range(n_users)]
     posts = [Post(i) for i in range(n_posts)]
     upvoted_posts_quality = []
     upvoted_posts_count = 0
     total_votes = 0
     correct_votes = 0
+    correct_votes_stats = []
     votes_stats = []
 
     for post in tqdm(posts, desc="Voting for posts"):
@@ -141,6 +142,9 @@ def run_simulation(n_users, n_posts, stages_percentiles = [50, 75]):
 
         if stage1_decision == 'upvote' and post.quality >= 0.5 or stage1_decision == 'downvote' and post.quality < 0.5:
             correct_votes += 1
+            correct_votes_stats.append(1)
+        else:
+            correct_votes_stats.append(0)
 
         votes_stats.append((1, post, stage1_votes, stage1_decision, users, len(stage1_candidates), num_stage1_users))
 
@@ -161,6 +165,9 @@ def run_simulation(n_users, n_posts, stages_percentiles = [50, 75]):
 
         if stage2_decision == 'upvote' and post.quality >= 0.5 or stage2_decision == 'downvote' and post.quality < 0.5:
             correct_votes += 1
+            correct_votes_stats.append(1)
+        else:
+            correct_votes_stats.append(0)
 
         votes_stats.append((2, post, stage2_votes, stage2_decision, users, len(stage2_candidates), num_stage2_users))
 
@@ -181,6 +188,9 @@ def run_simulation(n_users, n_posts, stages_percentiles = [50, 75]):
 
         if stage3_decision == 'upvote' and post.quality >= 0.5 or stage3_decision == 'downvote' and post.quality < 0.5:
             correct_votes += 1
+            correct_votes_stats.append(1)
+        else:
+            correct_votes_stats.append(0)
 
         votes_stats.append((3, post, stage3_votes, stage3_decision, users, len(stage3_candidates), num_stage3_users))
 
@@ -201,7 +211,7 @@ def run_simulation(n_users, n_posts, stages_percentiles = [50, 75]):
     print(f"Number of correct votes: {correct_votes}")
     print(f"Total number of votes: {total_votes}")
     print(f"Correct votes: {(correct_votes / total_votes) * 100:.2f}%")
-    plot_distributions(users, upvoted_posts_quality, correct_votes, total_votes, stages_percentiles_elo=stages_percentiles_elo)
+    plot_distributions(users, upvoted_posts_quality, correct_votes_stats, stages_percentiles_elo=stages_percentiles_elo, stages_candidates=[len(stage1_candidates), len(stage2_candidates), len(stage3_candidates)])
     return users
 
 def printStageResult(stage, post, votes, stage_result, users, users_stage_count, num_stage_users):
@@ -219,18 +229,32 @@ def printStageResult(stage, post, votes, stage_result, users, users_stage_count,
     stage1_result_colored = colored(stage_result, color_mapping.get(stage_result, 'default_color'))
     print(f"Stage {stage} majority decision: {stage1_result_colored}\n")
 
-def plot_distributions(users, upvoted_posts_quality, correct_votes, total_votes, stages_percentiles_elo):
+# Function to aggregate values by chunks of n and calculate proportion of correct votes
+def aggregate_votes(votes, chunk_size):
+    aggregated_data = []
+    for i in range(0, len(votes), chunk_size):
+        chunk = votes[i:i + chunk_size]
+        proportion_correct = np.sum(chunk) / len(chunk) * 100  # Convert to percentage
+        aggregated_data.append(proportion_correct)
+    return aggregated_data
+
+def plot_distributions(users, upvoted_posts_quality, correct_votes_stats, stages_percentiles_elo, stages_candidates):
     elo_ratings = [user.elo for user in users]
     goodness_factors = [user.goodness for user in users]
 
     plt.figure(figsize=(18, 6))
 
     plt.subplot(2, 3, 1)
+    plt.hist(goodness_factors, bins=100, edgecolor='black')
+    plt.xlabel('Goodness Factor')
+    plt.ylabel('Number of Users')
+    plt.title('Distribution of Users by Goodness Factor')
+
+    plt.subplot(2, 3, 2)
     plt.yscale('log')
     n, bins, patches = plt.hist(elo_ratings, bins=100, edgecolor='black')
     # Define colors for each percentile range
     colors = ['blue', 'green', 'red']
-
     # Paint each percentile range
     for i in range(len(bins) - 1):
         if bins[i] < stages_percentiles_elo[0]:
@@ -244,12 +268,6 @@ def plot_distributions(users, upvoted_posts_quality, correct_votes, total_votes,
     plt.ylabel('Number of Users')
     plt.title('Distribution of Users by Elo Rating')
 
-    plt.subplot(2, 3, 2)
-    plt.hist(goodness_factors, bins=100, edgecolor='black')
-    plt.xlabel('Goodness Factor')
-    plt.ylabel('Number of Users')
-    plt.title('Distribution of Users by Goodness Factor')
-
     plt.subplot(2, 3, 3)
     plt.hist(upvoted_posts_quality, bins=100, edgecolor='black')
     plt.xlabel('Post Quality')
@@ -258,17 +276,35 @@ def plot_distributions(users, upvoted_posts_quality, correct_votes, total_votes,
 
     # Plot
     plt.subplot(2, 3, 4)
-    labels = 'Good Posts', 'Bad Posts'
-    explode = (0, 0)
-    colors = ['blue', 'lightgray']
-    plt.pie([correct_votes, total_votes - correct_votes], explode=explode, labels=labels, colors=colors, autopct='%1.1f%%', shadow=True, startangle=90)
+    # Aggregate votes by chunks of 10
+    chunk_size = max(1, int(n_posts / 100))
+    aggregated_data = aggregate_votes(correct_votes_stats, chunk_size)
+    plt.plot(range(len(aggregated_data)), aggregated_data, linestyle='-', color='b')
+    plt.title('Proportion of Correct Votes Over Time')
+    plt.xlabel(f'Chunk Index (each representing {chunk_size} votes)')
+    plt.ylabel('Proportion of Correct Votes (%)')
+    # Set y-axis range to 0-100
+    plt.ylim(0, 100)
+
+    # Add grid for better readability
+    plt.grid(True)
+
+    plt.subplot(2, 3, 5)
+    stages = [1, 2, 3]
+    colors = ['blue', 'green', 'red']
+    plt.bar(stages, stages_candidates, edgecolor='black', color=colors)
+    # Set x-axis ticks
+    plt.xticks(stages)
+    plt.xlabel('Stages')
+    plt.ylabel('Number of Users')
+    plt.title('Distribution of Users by Stages')
 
     plt.tight_layout()
     plt.show()
 
 # Parameters
 n_users = 700
-n_posts = 3000
+n_posts = 30000
 
 # Run simulation
 users = run_simulation(n_users, n_posts)
