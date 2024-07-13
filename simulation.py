@@ -135,7 +135,7 @@ def run_simulation(n_users, n_posts, stages_percentiles = [70, 90]):
         
         # Stage 1 voting
         stage1_candidates = [user for user in users if user.elo <= stages_percentiles_elo[0]]
-        num_stage1_users = min(5, len(stage1_candidates))
+        num_stage1_users = min(15, len(stage1_candidates))
         stage1_users = random.sample(stage1_candidates, num_stage1_users)
         stage1_votes, stage1_decision = stage_voting(stage1_users, post)
         total_votes += 1
@@ -158,7 +158,7 @@ def run_simulation(n_users, n_posts, stages_percentiles = [70, 90]):
 
         # Stage 2 voting
         stage2_candidates = [user for user in users if user.elo > stages_percentiles_elo[0] and user.elo <= stages_percentiles_elo[1]]
-        num_stage2_users = min(5, len(stage2_candidates))
+        num_stage2_users = min(10, len(stage2_candidates))
         stage2_users = random.sample(stage2_candidates, num_stage2_users)
         stage2_votes, stage2_decision = stage_voting(stage2_users, post)
         total_votes += 1
@@ -303,8 +303,8 @@ def plot_distributions(users, upvoted_posts_quality, correct_votes_stats, stages
     plt.show()
 
 # Parameters
-n_users = 700
-n_posts = 30000
+n_users = 5000
+n_posts = 10000
 
 # Run simulation
 users = run_simulation(n_users, n_posts)
