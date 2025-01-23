@@ -14,7 +14,7 @@ class User:
         self.adjusted_goodness = self.goodness
 
     def generate_goodness(self):
-        goodness = np.random.exponential(scale=0.1)  # Adjusted scale to 0.3
+        goodness = np.random.exponential(scale=0.3)  # Adjusted scale to 0.3
         if goodness > 1:
             goodness = np.random.uniform()
         return goodness
@@ -63,7 +63,7 @@ def vote(user, post):
     return vote_decision
 
 
-def stage_voting(stage_users, post, forfeit_bonus=5):
+def stage_voting(stage_users, post, forfeit_bonus=0):
     votes = []
     stage_decision = "draw"
     for user in stage_users:
@@ -112,20 +112,25 @@ def stage_voting(stage_users, post, forfeit_bonus=5):
         for user in winning_team:
             user.elo += change_per_winner
         for user in losing_team:
-            user.elo -= change_per_loser
+            user.elo += change_per_loser  # (it’s negative, so they lose Elo)
 
     return votes, stage_decision
 
 
 def elo_update_team(winner_avg_elo, loser_avg_elo, k=32, winner_size=1, loser_size=1):
+    # 1. Compute the winner's expected score in a 2-team match
     expected_score_winner = 1 / (1 + 10 ** ((loser_avg_elo - winner_avg_elo) / 400))
+
+    # 2. The losers' expected score is the complement
     expected_score_loser = 1 - expected_score_winner
-    change_winner = k * (1 - expected_score_winner)
-    change_loser = k * (0 - expected_score_winner)
 
-    change_per_winner = change_winner / winner_size
-    change_per_loser = abs(change_loser / loser_size)
+    # 3. Compute total rating change for each side (team-level)
+    total_winner_delta = k * (1 - expected_score_winner)  # winners' actual score = 1
+    total_loser_delta = k * (0 - expected_score_loser)  # losers' actual score = 0
 
+    # 4. Divide equally among individuals in each team
+    change_per_winner = total_winner_delta / winner_size
+    change_per_loser = total_loser_delta / loser_size
     return change_per_winner, change_per_loser
 
 
@@ -417,8 +422,8 @@ def plot_distributions(
 
 
 # Parameters
-n_users = 5000
-n_posts = 10000
+n_users = 500
+n_posts = 1000000
 
 # Run simulation
 users = run_simulation(n_users, n_posts)
