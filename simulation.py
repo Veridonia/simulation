@@ -3,6 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from termcolor import colored
 from tqdm import tqdm
+import math
+import scipy.stats as st
+
+z = 1.645  # Z-score for 90% confidence
+p = 0.5  # assumed proportion
+E = 0.05  # margin of error (5%)
+sample_size = math.ceil((z**2 * p * (1 - p)) / (E**2))
 
 
 class User:
@@ -12,9 +19,10 @@ class User:
         self.goodness = self.generate_goodness()
         self.mood_factor = random.uniform(0, 0.1)  # Random value from 0 to 0.1
         self.adjusted_goodness = self.goodness
+        self.vote_count = 0
 
     def generate_goodness(self):
-        goodness = np.random.exponential(scale=0.3)  # Adjusted scale to 0.3
+        goodness = np.random.exponential(scale=0.1)  # Adjusted scale to 0.3
         if goodness > 1:
             goodness = np.random.uniform()
         return goodness
@@ -134,185 +142,118 @@ def elo_update_team(winner_avg_elo, loser_avg_elo, k=32, winner_size=1, loser_si
     return change_per_winner, change_per_loser
 
 
-def vote(user, post):
-    user.apply_mood()  # Update adjusted goodness before voting
-    if post.quality >= 0.5:
-        vote_decision = (
-            "upvote"
-            if random.uniform(0, 1) < user.adjusted_goodness
-            else random.choice(["downvote", "upvote"])
-        )
-    else:
-        vote_decision = (
-            "downvote"
-            if random.uniform(0, 1) < user.adjusted_goodness
-            else random.choice(["downvote", "upvote"])
-        )
-    return vote_decision
+def run_simulation():
+    posts_per_user = 2  # Approximate a more realistic tweet‐like frequency
+    max_population = 10000
 
+    with tqdm(total=max_population, desc="Growing user population") as pbar:
+        population = 1
+        posts = []
+        upvoted_posts_quality = []
+        upvoted_posts_count = 0
+        total_votes = 0
+        correct_votes = 0
+        correct_votes_stats = []
+        votes_stats = []
+        population_sizes = []
+        max_vote_counts = []
+        cumulative_votes_list = []
+        sample_used_list = []
+        users = []
+        confidence_levels = []
 
-def run_simulation(n_users, n_posts, stages_percentiles=[70, 90]):
-    users = [User(i) for i in range(n_users)]
-    posts = [Post(i) for i in range(n_posts)]
-    upvoted_posts_quality = []
-    upvoted_posts_count = 0
-    total_votes = 0
-    correct_votes = 0
-    correct_votes_stats = []
-    votes_stats = []
-
-    for post in tqdm(posts, desc="Voting for posts"):
-        # Extract the elo ratings
-        elos = np.array([user.elo for user in users])
-        stages_percentiles_elo = np.percentile(elos, stages_percentiles)
-
-        if len(votes_stats) > 10:
-            votes_stats = votes_stats[-10:]
-
-        # Stage 1 voting
-        stage1_candidates = [
-            user for user in users if user.elo <= stages_percentiles_elo[0]
-        ]
-        num_stage1_users = min(15, len(stage1_candidates))
-        stage1_users = random.sample(stage1_candidates, num_stage1_users)
-        stage1_votes, stage1_decision = stage_voting(stage1_users, post)
-        total_votes += 1
-
-        if (
-            stage1_decision == "upvote"
-            and post.quality >= 0.5
-            or stage1_decision == "downvote"
-            and post.quality < 0.5
-        ):
-            correct_votes += 1
-            correct_votes_stats.append(1)
-        else:
-            correct_votes_stats.append(0)
-
-        votes_stats.append(
-            (
-                1,
-                post,
-                stage1_votes,
-                stage1_decision,
-                users,
-                len(stage1_candidates),
-                num_stage1_users,
+        growth_rate = 0.10
+        population_increment = 1.0  # Start by adding 1 user at a time
+        while len(users) < max_population:
+            # Determine how many new users to add, but do not exceed max_population
+            new_count = min(
+                math.ceil(population_increment), max_population - len(users)
             )
-        )
+            new_users = [User(i) for i in range(len(users), len(users) + new_count)]
+            users.extend(new_users)
 
-        if stage1_decision == "downvote":
-            continue  # Skip to the next post if majority vote is not 'upvote'
-
-        if len(users) == len(stage1_candidates):
-            upvoted_posts_count += 1
-            upvoted_posts_quality.append(post.quality)
-            continue
-
-        # Stage 2 voting
-        stage2_candidates = [
-            user
-            for user in users
-            if user.elo > stages_percentiles_elo[0]
-            and user.elo <= stages_percentiles_elo[1]
-        ]
-        num_stage2_users = min(10, len(stage2_candidates))
-        stage2_users = random.sample(stage2_candidates, num_stage2_users)
-        stage2_votes, stage2_decision = stage_voting(stage2_users, post)
-        total_votes += 1
-
-        if (
-            stage2_decision == "upvote"
-            and post.quality >= 0.5
-            or stage2_decision == "downvote"
-            and post.quality < 0.5
-        ):
-            correct_votes += 1
-            correct_votes_stats.append(1)
-        else:
-            correct_votes_stats.append(0)
-
-        votes_stats.append(
-            (
-                2,
-                post,
-                stage2_votes,
-                stage2_decision,
-                users,
-                len(stage2_candidates),
-                num_stage2_users,
+            # Use the current population size (N) for the finite population correction formula
+            N = len(users)
+            sample_size_fp = math.ceil(
+                (N * (z**2 * p * (1 - p))) / ((E**2 * (N - 1)) + (z**2 * p * (1 - p)))
             )
-        )
+            sample_size = sample_size_fp
 
-        if stage2_decision == "downvote":
-            continue  # Skip to the next post if majority vote is not 'upvote'
+            # Calculate effective confidence level using the finite population correction
+            if sample_size >= N:
+                effective_confidence = (
+                    1.0  # Full confidence if the entire population is sampled
+                )
+            else:
+                # Invert the finite population correction: sample_size = n0 * N / (n0 + N - 1) => n0 = (sample_size * (N - 1)) / (N - sample_size)
+                effective_n0 = (sample_size * (N - 1)) / (N - sample_size)
+                # Compute effective Z-score from n0: n0 = (z^2 * p * (1 - p)) / (E**2) => z_eff = sqrt(n0 * (E**2) / (p * (1 - p)))
+                z_eff = math.sqrt(effective_n0 * (E**2) / (p * (1 - p)))
+                effective_confidence = 2 * st.norm.cdf(z_eff) - 1
 
-        if len(users) == len(stage2_candidates):
-            upvoted_posts_count += 1
-            upvoted_posts_quality.append(post.quality)
-            continue
+            confidence_levels.append(effective_confidence)
 
-        # Stage 3 voting
-        stage3_candidates = [
-            user for user in users if user.elo > stages_percentiles_elo[1]
-        ]
-        num_stage3_users = min(5, len(stage3_candidates))
-        stage3_users = random.sample(stage3_candidates, num_stage3_users)
-        stage3_votes, stage3_decision = stage_voting(stage3_users, post)
-        total_votes += 1
+            # Generate posts for these new users
+            new_posts = [
+                Post(i)
+                for i in range(len(posts), len(posts) + (posts_per_user * new_count))
+            ]
+            posts.extend(new_posts)
 
-        if (
-            stage3_decision == "upvote"
-            and post.quality >= 0.5
-            or stage3_decision == "downvote"
-            and post.quality < 0.5
-        ):
-            correct_votes += 1
-            correct_votes_stats.append(1)
-        else:
-            correct_votes_stats.append(0)
+            # Vote on these new posts
+            for post in new_posts:
+                if len(users) < sample_size:
+                    selected_users = users
+                else:
+                    selected_users = random.sample(users, sample_size)
 
-        votes_stats.append(
-            (
-                3,
-                post,
-                stage3_votes,
-                stage3_decision,
-                users,
-                len(stage3_candidates),
-                num_stage3_users,
-            )
-        )
+                for user in selected_users:
+                    user.vote_count += 1
 
-        if stage3_decision == "upvote":
-            upvoted_posts_count += 1
-            upvoted_posts_quality.append(post.quality)
+                votes, decision = stage_voting(selected_users, post, forfeit_bonus=0)
+                total_votes += 1
 
-    for vote_stat in votes_stats:
-        printStageResult(*vote_stat)
+                if (decision == "upvote" and post.quality >= 0.5) or (
+                    decision == "downvote" and post.quality < 0.5
+                ):
+                    correct_votes += 1
+                    correct_votes_stats.append(1)
+                else:
+                    correct_votes_stats.append(0)
+                votes_stats.append(
+                    (1, post, votes, decision, users, sample_size, sample_size)
+                )
+                if decision == "upvote":
+                    upvoted_posts_count += 1
+                    upvoted_posts_quality.append(post.quality)
 
-    print(f"Stage 1 percentile: {stages_percentiles[0]:.2f}%")
-    print(f"Stage 1 percentile elo: {stages_percentiles_elo[0]:.2f}")
-    print(f"Stage 2 percentile: {stages_percentiles[1]:.2f}%")
-    print(f"Stage 2 percentile elo: {stages_percentiles_elo[1]:.2f}")
-    print(f"Stage 3 percentile: {(100 - stages_percentiles[1]):.2f}%")
-    print(f"Number of posts upvoted through all 3 stages: {upvoted_posts_count}")
-    print(
-        f"Number of posts upvoted through all 3 stages (percent): {(upvoted_posts_count / total_votes) * 100:.2f}%"
-    )
+            # Record stage statistics
+            max_vote_counts.append(max(user.vote_count for user in users))
+            cumulative_votes_list.append(total_votes)
+            sample_used_list.append(min(len(users), sample_size))
+            population_sizes.append(len(users))
+
+            # Update the tqdm progress bar using the number of new users added
+            pbar.update(new_count)
+            pbar.set_postfix(current=len(users))
+
+            # Increase the user addition increment for the next stage
+            population_increment *= 1 + growth_rate
+
+    print(f"Number of posts upvoted through all voting: {upvoted_posts_count}")
     print(f"Number of correct votes: {correct_votes}")
     print(f"Total number of votes: {total_votes}")
     print(f"Correct votes: {(correct_votes / total_votes) * 100:.2f}%")
+
     plot_distributions(
         users,
         upvoted_posts_quality,
         correct_votes_stats,
-        stages_percentiles_elo=stages_percentiles_elo,
-        stages_candidates=[
-            len(stage1_candidates),
-            len(stage2_candidates),
-            len(stage3_candidates),
-        ],
+        population_sizes,
+        max_vote_counts,
+        cumulative_votes_list,
+        sample_used_list,
+        confidence_levels,
     )
     return users
 
@@ -351,82 +292,117 @@ def plot_distributions(
     users,
     upvoted_posts_quality,
     correct_votes_stats,
-    stages_percentiles_elo,
-    stages_candidates,
+    population_sizes,
+    max_vote_counts,
+    cumulative_votes_list,
+    sample_used_list,
+    confidence_levels,
 ):
-    elo_ratings = [user.elo for user in users]
-    goodness_factors = [user.goodness for user in users]
+    # Arrange plots in a grid with 3 rows and 3 columns to accommodate 7 subplots
+    plt.figure(figsize=(10, 8))
 
-    plt.figure(figsize=(18, 6))
-
-    plt.subplot(2, 3, 1)
-    plt.hist(goodness_factors, bins=100, edgecolor="black")
+    # Subplot 1: Distribution of Users by Goodness Factor
+    plt.subplot(3, 3, 1)
+    plt.hist([user.goodness for user in users], bins=100, edgecolor="black")
     plt.xlabel("Goodness Factor")
     plt.ylabel("Number of Users")
     plt.title("Distribution of Users by Goodness Factor")
 
-    plt.subplot(2, 3, 2)
-    plt.yscale("log")
-    n, bins, patches = plt.hist(elo_ratings, bins=100, edgecolor="black")
-    # Define colors for each percentile range
-    colors = ["blue", "green", "red"]
-    # Paint each percentile range
-    for i in range(len(bins) - 1):
-        if bins[i] < stages_percentiles_elo[0]:
-            patches[i].set_facecolor(colors[0])
-        elif (
-            bins[i] >= stages_percentiles_elo[0] and bins[i] < stages_percentiles_elo[1]
-        ):
-            patches[i].set_facecolor(colors[1])
-        elif bins[i] >= stages_percentiles_elo[1]:
-            patches[i].set_facecolor(colors[2])
-
+    # Subplot 2: Distribution of Users by Elo Rating
+    plt.subplot(3, 3, 2)
+    plt.hist([user.elo for user in users], bins=100, edgecolor="black", log=True)
     plt.xlabel("Elo Rating")
     plt.ylabel("Number of Users")
     plt.title("Distribution of Users by Elo Rating")
 
-    plt.subplot(2, 3, 3)
-    plt.hist(upvoted_posts_quality, bins=100, edgecolor="black")
-    plt.xlabel("Post Quality")
-    plt.ylabel("Number of Posts")
-    plt.title("Distribution of Upvoted Posts by Quality")
-
-    # Plot
-    plt.subplot(2, 3, 4)
-    # Aggregate votes by chunks of 10
-    chunk_size = max(1, int(n_posts / 100))
-    aggregated_data = aggregate_votes(correct_votes_stats, chunk_size)
-    plt.plot(range(len(aggregated_data)), aggregated_data, linestyle="-", color="b")
-
+    # Subplot 3: Proportion of Correct Votes Over Time
+    plt.subplot(3, 3, 3)
+    # Use a moving average to smooth the proportion of correct votes
+    if len(correct_votes_stats) > 10:
+        # For small datasets use a smaller window; for larger ones, scale the window size
+        if len(correct_votes_stats) < 50:
+            window_size = min(10, len(correct_votes_stats))
+        else:
+            window_size = max(10, int(len(correct_votes_stats) / 100))
+        smoothed = (
+            np.convolve(
+                correct_votes_stats, np.ones(window_size) / window_size, mode="valid"
+            )
+            * 100
+        )
+        plt.plot(range(len(smoothed)), smoothed, linestyle="-", color="b")
+    else:
+        plt.plot(
+            range(len(correct_votes_stats)),
+            np.array(correct_votes_stats) * 100,
+            linestyle="-",
+            color="b",
+        )
     plt.title("Proportion of Correct Votes Over Time")
-    plt.xlabel(f"Chunk Index (each representing {chunk_size} votes)")
+    plt.xlabel(f"Stage Index")
     plt.ylabel("Proportion of Correct Votes (%)")
-    # Set y-axis range to 0-100
     plt.ylim(0, 100)
-
-    # Add grid for better readability
     plt.grid(True)
 
-    plt.subplot(2, 3, 5)
-    stages = [1, 2, 3]
-    colors = ["blue", "green", "red"]
-    plt.bar(stages, stages_candidates, edgecolor="black", color=colors)
-    # Set x-axis ticks
-    plt.xticks(stages)
-    plt.xlabel("Stages")
-    plt.ylabel("Number of Users")
-    plt.title("Distribution of Users by Stages")
+    # Subplot 4: Population Over Time
+    plt.subplot(3, 3, 4)
+    plt.plot(
+        range(len(population_sizes)),
+        population_sizes,
+        label="Population Size",
+    )
+    plt.xlabel("Stage Index")
+    plt.ylabel("Population Size")
+    plt.title("Population Over Time")
+
+    # Subplot 5: Max Vote Ratio Over Time
+    plt.subplot(3, 3, 5)
+    # Calculate max vote ratio as the maximum vote count divided by the cumulative votes at that stage
+    max_vote_ratio = [
+        (
+            (max_vote_counts[i] / cumulative_votes_list[i]) * 100
+            if cumulative_votes_list[i] > 0
+            else 0
+        )
+        for i in range(len(max_vote_counts))
+    ]
+    plt.plot(
+        range(len(max_vote_ratio)),
+        max_vote_ratio,
+        color="r",
+    )
+    plt.xlabel("Stage Index")
+    plt.ylabel("Max Vote Ratio (%)")
+    plt.title("Max Vote Ratio Over Time")
+
+    # Subplot 6: Sample Size Used Over Time
+    plt.subplot(3, 3, 6)
+    plt.plot(
+        range(len(sample_used_list)),
+        sample_used_list,
+        color="g",
+    )
+    plt.xlabel("Stage Index")
+    plt.ylabel("Number of Voters")
+    plt.title("Sample Size Used Over Time")
+
+    # Subplot 7: Confidence Level Over Time
+    plt.subplot(3, 3, 7)
+    plt.plot(
+        range(len(confidence_levels)),
+        [c * 100 for c in confidence_levels],
+        color="m",
+        linestyle="-",
+    )
+    plt.xlabel("Stage Index")
+    plt.ylabel("Confidence Level (%)")
+    plt.title("Confidence Level Over Time")
+    plt.ylim(0, 100)
+    plt.grid(True)
 
     plt.tight_layout()
     plt.show()
 
 
-# Parameters
-n_users = 500
-n_posts = 1000000
-
 # Run simulation
-users = run_simulation(n_users, n_posts)
-
-# Plot distributions
-plot_distributions(users)
+users = run_simulation()
