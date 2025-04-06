@@ -37,7 +37,8 @@ Veridonia replaces the opaque, engagement-centric model with a transparent, comm
 
 **4.1 User Onboarding and Baseline Attributes**
 
-- **Initial Equality:** Upon joining, every user (registered or guest) is assigned a baseline ELO rating (e.g., 800), ensuring equal initial influence.
+- **IP-Based ELO Inheritance:** To protect the platform from bot attacks and coordinated manipulation, all new users inherit the ELO rating assigned to their IP address. After each voting stage, an IP address is updated to reflect the lowest ELO among its associated users. For example, if users from an IP (e.g., 156.156.156.3) have ELO ratings of 850, 700, and 1500, the IP is assigned an ELO of 700. Any new users registering from this IP will begin with an ELO of 700, capped at a default maximum (e.g., 800) for first-time IPs.
+- **Initial Assignment:** If the IP address has no previous users, a default ELO rating (e.g., 800) is used.
 - **Reputation Development:** Users' influence in content curation evolves over time, reflecting the accuracy and consistency of their judgements.
 
 **4.2 Post Submission**
