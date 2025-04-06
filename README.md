@@ -9,10 +9,11 @@ Veridonia is designed to improve online content curation by promoting transparen
 In this simulation:
 
 - **Users** are modeled with a baseline ELO rating (default of 800) and a "goodness" factor, which influences their voting behavior.
-- **Posts** have a quality score between 0 and 1.
+- **Posts** have a quality score between 0 and 1, with each user creating approximately 2 posts.
 - A **multi-stage voting process** determines whether a post is upvoted or downvoted, with users selected based on their ELO ratings.
 - A **special stage** allows low-ELO users (elo ≤ 800) to vote without affecting the overall decision, though their ELO is still adjusted.
-- The simulation also features a growing user population, mimicking a realistic social platform environment.
+- The simulation features a growing user population up to 5,000 users, mimicking a realistic social platform environment.
+- A **population sample voting** mechanism provides an alternative voting approach using statistically significant samples.
 
 ## Features
 
@@ -21,11 +22,18 @@ In this simulation:
 - **Multi-Stage Voting:**
   - For populations with fewer than 20 high-ELO users, a single stage of voting is performed.
   - For larger populations, a two-stage process is used:
-    - **Stage 1:** A sample from the lower ELO tier (bottom 70%) votes.
-    - **Stage 2:** If the first stage decision is positive (upvote), a sample from the upper ELO tier (top 30%) is used to validate the decision.
+    - **Stage 1:** A sample from the lower ELO tier (bottom 70%) votes. The sample size scales with population size.
+    - **Stage 2:** If the first stage decision is inconclusive, a sample from the upper ELO tier (top 30%) is used to validate the decision.
   - **Special Stage:** Low-ELO users (≤ 800) vote separately, and their votes are used only to adjust their own ELO scores.
+- **Population Sample Voting:** An alternative voting mechanism that uses statistically significant samples from the entire population to make decisions.
 - **ELO Adjustments:** User ratings are updated based on vote outcomes using team-based ELO updates.
-- **Visualization:** After simulation runs, various plots display distributions of user goodness, ELO ratings, voting accuracy over time, population growth, vote ratios, and sample sizes.
+- **Visualization:** After simulation runs, various plots display:
+  - Distribution of user goodness and ELO ratings
+  - Comparison of correct votes ratio between staged and population sample voting
+  - Population growth over time
+  - Sample sizes used in voting
+  - Voting participation ratios by user group
+  - Linear regression analysis of voting accuracy trends
 
 ## Dependencies
 
@@ -63,10 +71,10 @@ pip install numpy matplotlib termcolor tqdm scipy
 
    This will:
 
-   - Grow the user population gradually until it reaches 10,000 users.
-   - Generate posts and simulate the multi-stage voting process.
+   - Grow the user population gradually until it reaches 5,000 users.
+   - Generate posts (approximately 2 per user) and simulate both multi-stage and population sample voting processes.
    - Update users' ELO ratings based on voting accuracy.
-   - Display various visualizations of the simulation data.
+   - Display comprehensive visualizations comparing different voting mechanisms and their effectiveness.
 
 ## Acknowledgements
 
