@@ -1,10 +1,10 @@
 # Veridonia Simulation
 
-This repository contains a simulation of the Veridonia content curation system. The simulation implements a community-driven multi-stage voting process paired with an ELO-based reputation system. It is inspired by the system described in the Veridonia whitepaper. Some differences in implementation exist to better suit the simulation environment.
+This repository contains a simulation of the Veridonia content curation system. The simulation implements a community-driven multi-stage voting process paired with an ELO-based reputation system. It is based on the principles outlined in the [Veridonia Whitepaper](Whitepaper.md) included in this repository. Some differences in implementation exist to better suit the simulation environment.
 
 ## Overview
 
-Veridonia is designed to improve online content curation by promoting transparency, meritocracy, and community governance. Instead of relying on opaque, engagement-driven algorithms, Veridonia leverages a multi-stage voting mechanism and dynamic reputation adjustments to evaluate content quality.
+Veridonia is designed to improve online content curation by promoting transparency, meritocracy, and community governance. Instead of relying on opaque, engagement-driven algorithms that fuel sensationalism and misinformation, Veridonia leverages a multi-stage voting mechanism and dynamic reputation adjustments to evaluate content quality.
 
 In this simulation:
 
@@ -76,9 +76,22 @@ pip install numpy matplotlib termcolor tqdm scipy
    - Update users' ELO ratings based on voting accuracy.
    - Display comprehensive visualizations comparing different voting mechanisms and their effectiveness.
 
+## Relationship to the Whitepaper
+
+This simulation serves as a practical implementation of the theoretical framework described in the [Veridonia Whitepaper](Whitepaper.md). While the whitepaper provides the complete conceptual principles and governance model, this simulation focuses specifically on testing the effectiveness of the multi-stage voting and ELO-based reputation mechanisms.
+
+The whitepaper covers additional topics not implemented in this simulation, including:
+
+- Detailed discussion of problems with current content curation systems
+- More comprehensive governance frameworks
+- Data privacy considerations
+- Long-term vision for transparent information ecosystems
+
+For a deeper understanding of the Veridonia concept, please refer to the whitepaper.
+
 ## Acknowledgements
 
-This simulation is a proof-of-concept implementation based on the principles outlined in the Veridonia whitepaper. It aims to explore the potential of community-driven content curation and transparent reputation systems. Please refer to the whitepaper for the complete theoretical framework.
+This simulation is a proof-of-concept implementation based on the principles outlined in the Veridonia whitepaper. It aims to explore the potential of community-driven content curation and transparent reputation systems.
 
 ---
 

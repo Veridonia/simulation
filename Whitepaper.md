@@ -10,6 +10,8 @@ Veridonia introduces a transformative approach to online content curation, addre
 
 The digital landscape today is dominated by engagement metrics such as views, likes, and shares, which serve as the primary indicators of content performance. This focus on the attention economy has led to the widespread prioritisation of sensationalism over substance, contributing to the rapid spread of misinformation, the formation of ideological echo chambers, and a general decline in content quality. Furthermore, opaque algorithms that dictate content visibility and maximise engagement at all costs have exacerbated issues of mistrust and reduced accountability.
 
+The current paradigm of social media platforms is fundamentally misaligned with societal needs. Rather than serving as conduits for meaningful information exchange, these platforms have evolved into sophisticated attention-capture mechanisms. Their algorithms are designed to maximise user screen time through psychological manipulation, often at the expense of content that truly matters to society. This approach has created a digital environment where the most engaging content—regardless of its value or accuracy—receives the greatest visibility, whilst meaningful discourse and important information are frequently overshadowed.
+
 Veridonia is conceived as a response to these challenges. By re-engineering the content curation process, Veridonia aims to restore trust in online information sharing and empower communities to determine quality based on transparent, verifiable standards rather than commercial or algorithmic bias.
 
 ### 2. Problem Statement
